@@ -820,3 +820,97 @@ class TestRenderTimeline:
                 "render_timeline",
                 {"timeline": {"clips": [{"source": str(settings.workspace / "nope.mp4")}]}},
             )
+
+
+class TestInspectionTools:
+    """The editing loop needs to look at and measure media, not just render it."""
+
+    async def test_a_frame_can_be_extracted_and_is_a_real_image(
+        self, settings: Settings, clip: Path
+    ) -> None:
+        result = await call_tool(
+            "extract_frame", {"input_path": str(clip), "time": 1.5, "width": 160}
+        )
+        assert Path(result["output_path"]).exists()
+        assert result["width"] == 160
+        assert result["time"] == 1.5
+
+    async def test_extracting_past_the_end_is_refused(self, settings: Settings, clip: Path) -> None:
+        from ffmpeg_mcp.errors import InvalidParameterError
+
+        with pytest.raises(InvalidParameterError, match="past the end"):
+            await call_tool("extract_frame", {"input_path": str(clip), "time": 99.0})
+
+    async def test_a_filmstrip_tiles_the_requested_frames(
+        self, settings: Settings, clip: Path
+    ) -> None:
+        result = await call_tool(
+            "extract_filmstrip",
+            {"input_path": str(clip), "count": 4, "columns": 4, "tile_width": 80},
+        )
+        assert len(result["times"]) == 4
+        assert result["rows"] == 1
+        sheet = await call_tool("probe_media", {"input_path": result["output_path"]})
+        # Four 80px tiles side by side.
+        assert sheet["video_streams"][0]["width"] == pytest.approx(320, abs=8)
+
+    async def test_a_filmstrip_wraps_onto_multiple_rows(
+        self, settings: Settings, clip: Path
+    ) -> None:
+        result = await call_tool(
+            "extract_filmstrip",
+            {"input_path": str(clip), "count": 6, "columns": 3, "tile_width": 60},
+        )
+        assert result["rows"] == 2
+
+    async def test_analysis_measures_brightness_and_colour(
+        self, settings: Settings, clip: Path
+    ) -> None:
+        result = await call_tool("analyze_video", {"input_path": str(clip), "count": 4})
+        assert len(result["frames"]) == 4
+        assert 0 < result["luma_avg"] < 255
+        assert result["is_greyscale"] is False  # the fixture is a colour test pattern
+
+    async def test_analysis_detects_a_greyscale_render(
+        self, settings: Settings, clip: Path
+    ) -> None:
+        # Grade the colour out, then confirm the analyser notices.
+        grey = await run_job_ok(
+            "color_grade", {"input_path": str(clip), "saturation": 0.0}, settings
+        )
+        result = await call_tool(
+            "analyze_video", {"input_path": str(output_path(grey)), "count": 3}
+        )
+        assert result["is_greyscale"] is True
+        assert any("greyscale" in n for n in result["notes"])
+
+    async def test_analysis_detects_crushed_blacks(self, settings: Settings, clip: Path) -> None:
+        dark = await run_job_ok(
+            "color_grade",
+            {"input_path": str(clip), "brightness": -0.85, "contrast": 1.5},
+            settings,
+        )
+        result = await call_tool(
+            "analyze_video", {"input_path": str(output_path(dark)), "count": 3}
+        )
+        assert result["crushed_blacks"] is True
+        assert any("shadow detail" in n for n in result["notes"])
+
+    async def test_audio_is_measured(self, settings: Settings, clip: Path) -> None:
+        record = await run_job_ok("measure_audio", {"input_path": str(clip)}, settings)
+        assert record.result["mean_volume_db"] is not None
+        assert record.result["max_volume_db"] is not None
+
+    async def test_measuring_a_silent_file_says_so(
+        self, settings: Settings, cuts_clip: Path
+    ) -> None:
+        record = await run_job("measure_audio", {"input_path": str(cuts_clip)}, settings)
+        assert record.status is JobStatus.FAILED
+        assert record.error is not None
+        assert record.error.code == "invalid_parameter"
+
+    async def test_inspection_needs_a_video_stream(self, settings: Settings, speech: Path) -> None:
+        from ffmpeg_mcp.errors import InvalidParameterError
+
+        with pytest.raises(InvalidParameterError, match="no video"):
+            await call_tool("extract_frame", {"input_path": str(speech), "time": 0.5})

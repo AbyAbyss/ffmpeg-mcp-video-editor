@@ -135,5 +135,6 @@ def load_all_tools() -> list[ToolSpec]:
         transcription,
         vision,
     )
+    from . import inspect as inspect_tools  # noqa: F401
 
     return all_tools()

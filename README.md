@@ -6,8 +6,8 @@
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python 3.11 | 3.12">
   <img src="https://img.shields.io/badge/MCP-stdio-E8630A" alt="MCP: stdio transport">
   <img src="https://img.shields.io/badge/ffmpeg-6%2B-007808?logo=ffmpeg&logoColor=white" alt="ffmpeg 6+">
-  <img src="https://img.shields.io/badge/tools-32-1b1b1b" alt="32 MCP tools">
-  <img src="https://img.shields.io/badge/tests-651-22c55e" alt="651 tests">
+  <img src="https://img.shields.io/badge/tools-36-1b1b1b" alt="36 MCP tools">
+  <img src="https://img.shields.io/badge/tests-711-22c55e" alt="711 tests">
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-555" alt="Platforms">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3da639" alt="License: MIT"></a>
 </p>
@@ -33,7 +33,7 @@
 
 ## Features
 
-- **Typed tools, not a shell** — ffmpeg's editing surface arrives as 32 schema'd MCP tools, so the calling model gets parameters and guardrails instead of hand-writing filter graphs.
+- **Typed tools, not a shell** — ffmpeg's editing surface arrives as 36 schema'd MCP tools, so the calling model gets parameters and guardrails instead of hand-writing filter graphs.
 - **Nothing blocks** — anything that encodes frames returns a job id immediately, with real progress parsed from ffmpeg's own output and a cancel that actually kills the subprocess.
 - **Zero setup** — finds your ffmpeg, or downloads a verified static build for your OS on first run. The Whisper and face models fetch themselves too.
 - **Captions that survive their own text** — a subtitle containing `Time: 12:30, [note]; it's 50%` would corrupt a naively built filter graph. Here it doesn't, and there's a test proving it.
@@ -41,7 +41,8 @@
 - **Hears speech** — Whisper transcription, translation, and one-shot auto-captioning with word-level timestamps.
 - **Renders whole timelines** — clips, transitions, overlays, captions and ducked audio tracks compile into a single ffmpeg pass.
 - **Two front doors, one backend** — the optional local UI shares the same job store, so it and your MCP client see and cancel each other's work.
-- **Tested where it counts** — 651 tests; the 418 unit tests run with no ffmpeg installed at all.
+- **Can see what it edits** — extract a frame or a contact sheet, measure brightness, colour and loudness. Editing is a loop, so the server can check its own output rather than rendering blind.
+- **Tested where it counts** — 711 tests; the unit tests run with no ffmpeg installed at all.
 
 ## Quick start
 
@@ -146,6 +147,7 @@ frame looks worse than a slightly imperfect one that glides.
 | 🎞 | **Compose** | `add_transition` · `overlay_media` · `render_timeline` |
 | 🔊 | **Audio** | `mix_audio` · `normalize_audio` · `fade_audio` |
 | 📐 | **Format** | `resize_video` · `list_resolution_presets` |
+| 🔍 | **Inspect** | `extract_frame` · `extract_filmstrip` · `analyze_video` · `measure_audio` |
 
 <sub>Six tools are read-only and answer synchronously — <code>probe_media</code>, <code>list_capabilities</code>, <code>list_resolution_presets</code>, and the three job queries. The rest return a job id.</sub>
 
@@ -218,8 +220,8 @@ against a pinned SHA-256.
 ## Development
 
 ```bash
-uv run pytest                       # 651 tests
-uv run pytest -m "not integration"  # 418 of them need no ffmpeg
+uv run pytest                       # 711 tests
+uv run pytest -m "not integration"  # most need no ffmpeg
 uv run ruff check . && uv run ruff format --check .
 uv run mypy
 ```
