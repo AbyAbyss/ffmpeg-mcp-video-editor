@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+      - run: uv sync --all-extras
+      # The unit suite runs with no ffmpeg present, which is the point: it
+      # covers the pure logic — filter building and escaping, path validation,
+      # the job store, parsing and geometry. Integration tests render real
+      # media and are run locally with `make test-integration`.
+      - run: uv run pytest -m "not integration"
+        env:
+          FFMPEG_MCP_AUTO_DOWNLOAD: "0"
+
+  ui:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ui-src/package-lock.json
+      - run: npm ci
+        working-directory: ui-src
+      - run: npm run build
+        working-directory: ui-src
+      # The built assets are committed so the UI runs without a Node toolchain.
+      # If this fails, the checked-in bundle is stale.
+      - name: Check committed bundle is up to date
+        run: git diff --exit-code -- src/ffmpeg_mcp/ui/static
