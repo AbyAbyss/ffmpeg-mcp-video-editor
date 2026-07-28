@@ -92,6 +92,7 @@ textarea {
   gap: 9px;
   font-weight: 620;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .brand .dot {
@@ -140,6 +141,53 @@ textarea {
   box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 
+.project-picker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.project-label {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.project-select,
+.project-new {
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 120px;
+  max-width: 190px;
+}
+
+.project-select:focus,
+.project-new:focus {
+  outline: none;
+  border-color: var(--accent-line);
+}
+
+.project-add {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.project-add:hover {
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
 .topbar-right {
   margin-left: auto;
   display: flex;
@@ -147,6 +195,14 @@ textarea {
   gap: 14px;
   color: var(--text-faint);
   font-size: 12px;
+  min-width: 0;
+}
+
+/* A deep workspace path must not push the rest of the bar out of shape. */
+.topbar-right .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .link-status {
@@ -306,6 +362,15 @@ main {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--text-faint);
+}
+
+.job-project {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
 }
 
 .badge {

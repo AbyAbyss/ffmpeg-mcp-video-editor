@@ -21,11 +21,29 @@ export interface Job {
   error: { code: string; message: string; details?: Record<string, unknown> } | null;
   command: string | null;
   params: Record<string, unknown>;
+  project: string;
 }
 
 export interface JobsResponse {
   jobs: Job[];
   counts: Record<string, number>;
+}
+
+/** One project and how much work it holds. */
+export interface ProjectSummary {
+  name: string;
+  jobs: number;
+  queued: number;
+  running: number;
+  done: number;
+  failed: number;
+  last_activity: number | null;
+  is_active: boolean;
+}
+
+export interface ProjectList {
+  active: string;
+  projects: ProjectSummary[];
 }
 
 export interface JsonSchema {
@@ -119,6 +137,25 @@ export async function cancelJob(jobId: string): Promise<Job> {
   return unwrap(
     await fetch(`/api/jobs/${jobId}/cancel`, { method: "POST", headers: headers() }),
   );
+}
+
+/**
+ * Projects go through the tool endpoints rather than `/api/projects`, because
+ * the tool also reports which project is active — including one switched into
+ * but not yet used, which has no jobs to be listed from.
+ */
+export async function listProjects(): Promise<ProjectList> {
+  return callTool<ProjectList>("list_projects", {});
+}
+
+/**
+ * Switch the project new work is filed under.
+ *
+ * This is the UI process's own active project; an attached MCP client keeps
+ * its own, so switching here cannot move that session's work.
+ */
+export async function setProject(name: string): Promise<{ output_directory: string }> {
+  return callTool<{ output_directory: string }>("set_project", { name });
 }
 
 export async function listTools(): Promise<Tool[]> {

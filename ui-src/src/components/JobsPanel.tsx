@@ -15,11 +15,13 @@ const STATUS_ORDER = ["running", "queued", "done", "failed", "cancelled"] as con
 interface Props {
   jobs: Job[];
   counts: Record<string, number>;
+  /** Only worth showing when the list spans more than one project. */
+  showProject: boolean;
   selectedId: string | null;
   onSelect: (job: Job) => void;
 }
 
-export default function JobsPanel({ jobs, counts, selectedId, onSelect }: Props) {
+export default function JobsPanel({ jobs, counts, showProject, selectedId, onSelect }: Props) {
   const [filter, setFilter] = useState<string>("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +101,7 @@ export default function JobsPanel({ jobs, counts, selectedId, onSelect }: Props)
                   {job.status}
                 </span>
                 <span className="job-id">{job.job_id.slice(0, 8)}</span>
+                {showProject && <span className="job-project">{job.project}</span>}
                 <span className="spacer" />
                 {(job.status === "queued" || job.status === "running") && (
                   <button
