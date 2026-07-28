@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Frontend
+ui-src/node_modules/
+ui-src/.vite/
+
+# Generated test fixtures (regenerated on demand by the test suite)
+tests/fixtures/
+
+# Local workspace
+.ffmpeg-mcp/

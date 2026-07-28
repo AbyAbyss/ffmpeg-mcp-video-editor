@@ -1,0 +1,70 @@
+[project]
+name = "ffmpeg-mcp"
+version = "0.1.0"
+description = "MCP server exposing ffmpeg video/image editing plus Whisper and vision-assisted tools"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "mcp>=1.2.0",
+    "pydantic>=2.6",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.0.3"]
+vision = [
+    "mediapipe>=0.10.14",
+    "opencv-python>=4.9",
+    "numpy>=1.26",
+]
+ui = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+ffmpeg-mcp-server = "ffmpeg_mcp.server:main"
+ffmpeg-mcp-ui = "ffmpeg_mcp.ui.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.1",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.9",
+    "types-requests",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ffmpeg_mcp"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+strict = true
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = ["cv2.*", "mediapipe.*", "faster_whisper.*", "numpy.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests that require a real ffmpeg binary",
+]
