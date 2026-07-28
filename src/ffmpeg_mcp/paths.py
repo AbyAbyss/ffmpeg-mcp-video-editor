@@ -44,6 +44,79 @@ def looks_like_assistant_sandbox(path: Path) -> bool:
     )
 
 
+# Fonts live in read-only OS directories that no sensible allowlist contains.
+# Widening ALLOWED_ROOTS to reach them would open those roots to every tool, so
+# fonts get their own narrow rule instead: a real file, a font extension, and
+# either inside the allowlist or inside a known system font directory.
+_SYSTEM_FONT_DIRS = (
+    "/System/Library/Fonts",
+    "/Library/Fonts",
+    "/usr/share/fonts",
+    "/usr/local/share/fonts",
+    "/run/current-system/sw/share/X11/fonts",
+    "C:/Windows/Fonts",
+)
+FONT_SUFFIXES = {".ttf", ".otf", ".ttc", ".otc", ".pfb"}
+
+
+def _font_directories() -> list[Path]:
+    """Every location fonts are normally installed, across the three platforms."""
+    dirs = [Path(d).expanduser().resolve(strict=False) for d in _SYSTEM_FONT_DIRS]
+    for relative in (("Library", "Fonts"), (".fonts",), (".local", "share", "fonts")):
+        dirs.append(Path.home().joinpath(*relative).resolve(strict=False))
+    return dirs
+
+
+def validate_font_file(raw: str | Path, settings: Settings | None = None) -> Path:
+    """Resolve a font path, allowing the OS font directories as well as the allowlist.
+
+    Reading a font is not the risk the allowlist exists to prevent, and the
+    fonts anyone actually wants are in system locations by definition.
+    """
+    settings = settings or get_settings()
+    path = Path(raw).expanduser().resolve(strict=False)
+
+    if path.suffix.lower() not in FONT_SUFFIXES:
+        raise InvalidPathError(
+            "Font must be a .ttf, .otf, .ttc or .otc file.",
+            path=str(path),
+            supported=sorted(FONT_SUFFIXES),
+        )
+    if not path.is_file():
+        raise InvalidPathError("Font file does not exist.", path=str(path))
+
+    roots = [r.resolve(strict=False) for r in settings.allowed_roots]
+    font_dirs = _font_directories()
+
+    if any(_is_within(path, root) for root in roots + font_dirs):
+        return path
+    raise InvalidPathError(
+        "Font is neither inside an allowed root nor a system font directory.",
+        path=str(path),
+        allowed_roots=[str(r) for r in roots],
+        font_directories=[str(d) for d in font_dirs],
+    )
+
+
+def validate_font_dir(raw: str | Path, settings: Settings | None = None) -> Path:
+    """Resolve a font *directory*, allowing the OS font locations as well."""
+    settings = settings or get_settings()
+    path = Path(raw).expanduser().resolve(strict=False)
+    if not path.is_dir():
+        raise InvalidPathError("Font directory does not exist.", path=str(path))
+
+    roots = [r.resolve(strict=False) for r in settings.allowed_roots]
+    font_dirs = _font_directories()
+    if any(_is_within(path, root) or path == root for root in roots + font_dirs):
+        return path
+    raise InvalidPathError(
+        "Font directory is neither inside an allowed root nor a system font location.",
+        path=str(path),
+        allowed_roots=[str(r) for r in roots],
+        font_directories=[str(d) for d in font_dirs],
+    )
+
+
 def resolve_within_roots(raw: str | Path, settings: Settings | None = None) -> Path:
     """Resolve ``raw`` and assert it lives under one of the allowed roots.
 

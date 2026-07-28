@@ -324,7 +324,7 @@ class TestBuildSkew:
     ) -> None:
         from pydantic import BaseModel
 
-        from ffmpeg_mcp.jobs.worker import JobContext, JobOutcome, register_handler
+        from ffmpeg_mcp.jobs.worker import JobOutcome, register_handler
 
         class Strict(BaseModel, extra="forbid"):
             known: int = 0

@@ -32,7 +32,12 @@ from ..ffmpeg.probe import probe
 from ..ffmpeg.runner import run_ffmpeg
 from ..jobs.worker import JobContext, JobOutcome, handler
 from ..models import EncodeOptions, JobSubmission, Segment, StrictModel
-from ..paths import validate_input_file, validate_output_path
+from ..paths import (
+    validate_font_dir,
+    validate_font_file,
+    validate_input_file,
+    validate_output_path,
+)
 from ..subtitles import build_srt, parse_srt
 from .common import MediaJobArgs, finish_media_job, queue, resolve_io
 from .registry import tool
@@ -271,9 +276,7 @@ async def burn_captions_into(
 
     fonts_dir = None
     if args.fonts_dir:
-        from ..paths import resolve_within_roots
-
-        fonts_dir = resolve_within_roots(args.fonts_dir, ctx.settings)
+        fonts_dir = validate_font_dir(args.fonts_dir, ctx.settings)
 
     chain = FilterChain(
         filters=[
@@ -448,7 +451,7 @@ async def text_overlay(args: TextOverlayArgs) -> JobSubmission:
         if item.x is None:
             position_expressions(item.position, item.margin)
         if item.font_file:
-            validate_input_file(item.font_file)
+            validate_font_file(item.font_file)
     return queue("text_overlay", args)
 
 
@@ -464,7 +467,7 @@ async def _run_text_overlay(ctx: JobContext) -> JobOutcome:
     for index, item in enumerate(args.items):
         textfile = ctx.workdir / f"overlay_{index}.txt"
         textfile.write_text(item.text, encoding="utf-8")
-        font_file = validate_input_file(item.font_file, ctx.settings) if item.font_file else None
+        font_file = validate_font_file(item.font_file, ctx.settings) if item.font_file else None
         filters.append(build_overlay_filter(item, textfile, info.duration, font_file))
 
     chain = FilterChain(filters=filters)

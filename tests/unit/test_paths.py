@@ -166,3 +166,54 @@ class TestUnreachablePathMessages:
         target = workspace / "mnt" / "user-data"
         target.mkdir(parents=True)
         assert resolve_within_roots(target, configured) == target
+
+
+class TestFontPaths:
+    """Fonts live in read-only OS directories no allowlist would contain.
+
+    Requiring ALLOWED_ROOTS to include /System just to draw text would open
+    those roots to every other tool, so fonts get their own narrow rule.
+    """
+
+    def test_a_system_font_is_allowed(self, settings: Settings) -> None:
+        from ffmpeg_mcp.paths import validate_font_file
+
+        candidates = [
+            Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+            Path("/Library/Fonts/Arial.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        ]
+        present = next((c for c in candidates if c.is_file()), None)
+        if present is None:
+            pytest.skip("no system font present to test with")
+        assert validate_font_file(present, settings) == present
+
+    def test_a_font_inside_the_workspace_is_allowed(self, settings: Settings) -> None:
+        from ffmpeg_mcp.paths import validate_font_file
+
+        font = settings.workspace / "brand.ttf"
+        font.write_bytes(b"not really a font, but a real file")
+        assert validate_font_file(font, settings) == font
+
+    def test_a_non_font_extension_is_refused(self, settings: Settings) -> None:
+        from ffmpeg_mcp.paths import validate_font_file
+
+        bad = settings.workspace / "payload.sh"
+        bad.write_text("#!/bin/sh")
+        with pytest.raises(InvalidPathError, match="ttf"):
+            validate_font_file(bad, settings)
+
+    def test_the_font_rule_does_not_open_the_rest_of_the_system(self, settings: Settings) -> None:
+        # A font extension must not become a way to read arbitrary locations.
+        from ffmpeg_mcp.paths import validate_font_file
+
+        with pytest.raises(InvalidPathError):
+            validate_font_file("/etc/passwd", settings)
+        with pytest.raises(InvalidPathError):
+            validate_font_file("/etc/shadow.ttf", settings)
+
+    def test_a_missing_font_is_refused(self, settings: Settings) -> None:
+        from ffmpeg_mcp.paths import validate_font_file
+
+        with pytest.raises(InvalidPathError, match="does not exist"):
+            validate_font_file(settings.workspace / "nope.ttf", settings)
