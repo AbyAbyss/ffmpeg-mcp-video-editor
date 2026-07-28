@@ -137,6 +137,7 @@ class JobRecord(StrictModel):
     message: str | None = Field(default=None, description="Human-readable current step.")
     cancel_requested: bool = False
     worker_pid: int | None = None
+    project: str | None = Field(default=None, description="The project this job was filed under.")
 
 
 class JobSubmission(StrictModel):

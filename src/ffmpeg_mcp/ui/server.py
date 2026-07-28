@@ -128,13 +128,30 @@ class JobView(BaseModel):
     error: dict[str, Any] | None = None
     command: str | None = None
     params: dict[str, Any] = Field(default_factory=dict)
+    project: str | None = None
 
 
 class JobsResponse(BaseModel):
-    """A page of jobs plus queue-wide counts."""
+    """A page of jobs plus counts for the scope being listed."""
 
     jobs: list[JobView]
     counts: dict[str, int]
+    total: int = 0
+    offset: int = 0
+    limit: int = 100
+    has_more: bool = False
+
+
+class ProjectRow(BaseModel):
+    """One project and how much work it holds."""
+
+    name: str
+    jobs: int
+    queued: int = 0
+    running: int = 0
+    done: int = 0
+    failed: int = 0
+    last_activity: float | None = None
 
 
 class ToolView(BaseModel):
@@ -183,6 +200,7 @@ def _to_view(record: Any) -> JobView:
         error=record.error.model_dump() if record.error else None,
         command=record.command,
         params=record.params,
+        project=record.project or "default",
     )
 
 
@@ -331,15 +349,32 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
 
     # -- jobs ------------------------------------------------------------ #
 
+    @app.get("/api/projects", dependencies=[Depends(require_token)])
+    async def projects() -> list[ProjectRow]:
+        """Every project in the store, so the UI can offer them as filters."""
+        return [ProjectRow(**row) for row in state().store.list_projects()]
+
     @app.get("/api/jobs", dependencies=[Depends(require_token)])
     async def list_jobs(
-        status: JobStatus | None = None, limit: int = Query(default=100, ge=1, le=500)
+        status: JobStatus | None = None,
+        project: str | None = Query(default=None, description="Omit or 'all' for every project."),
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
     ) -> JobsResponse:
-        """Every job the store knows about, newest first."""
+        """A page of jobs, newest first, optionally scoped to one project."""
         current = state()
-        records = current.store.list_jobs(status=status, limit=limit)
+        selector = None if project in (None, "all") else project
+        records = current.store.list_jobs(
+            status=status, project=selector, limit=limit, offset=offset
+        )
+        total = current.store.count_jobs(status, selector)
         return JobsResponse(
-            jobs=[_to_view(r) for r in records], counts=current.store.counts_by_status()
+            jobs=[_to_view(r) for r in records],
+            counts=current.store.counts_by_status(selector),
+            total=total,
+            offset=offset,
+            limit=limit,
+            has_more=offset + len(records) < total,
         )
 
     @app.get("/api/jobs/{job_id}", dependencies=[Depends(require_token)])

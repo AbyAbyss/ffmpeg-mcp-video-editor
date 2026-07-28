@@ -94,13 +94,18 @@ class TestTrim:
         )
         assert output_path(record) == target
 
-    async def test_trim_without_an_output_path_lands_in_the_job_directory(
+    async def test_trim_without_an_output_path_lands_in_the_project_directory(
         self, settings: Settings, clip: Path
     ) -> None:
+        # Unspecified outputs are scoped by project, so concurrent sessions do
+        # not pile into a single shared directory.
         record = await run_job_ok(
             "trim", {"input_path": str(clip), "start": 0.0, "end": 1.0}, settings
         )
-        assert output_path(record).parent == settings.jobs_dir / record.job_id
+        assert (
+            output_path(record).parent
+            == settings.workspace / "projects" / "default" / record.job_id
+        )
 
     async def test_open_ended_trim_runs_to_the_end_of_the_file(
         self, settings: Settings, clip: Path

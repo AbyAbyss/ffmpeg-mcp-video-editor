@@ -6,8 +6,8 @@
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python 3.11 | 3.12">
   <img src="https://img.shields.io/badge/MCP-stdio-E8630A" alt="MCP: stdio transport">
   <img src="https://img.shields.io/badge/ffmpeg-6%2B-007808?logo=ffmpeg&logoColor=white" alt="ffmpeg 6+">
-  <img src="https://img.shields.io/badge/tools-36-1b1b1b" alt="36 MCP tools">
-  <img src="https://img.shields.io/badge/tests-711-22c55e" alt="711 tests">
+  <img src="https://img.shields.io/badge/tools-38-1b1b1b" alt="38 MCP tools">
+  <img src="https://img.shields.io/badge/tests-727-22c55e" alt="727 tests">
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-555" alt="Platforms">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3da639" alt="License: MIT"></a>
 </p>
@@ -33,7 +33,7 @@
 
 ## Features
 
-- **Typed tools, not a shell** — ffmpeg's editing surface arrives as 36 schema'd MCP tools, so the calling model gets parameters and guardrails instead of hand-writing filter graphs.
+- **Typed tools, not a shell** — ffmpeg's editing surface arrives as 38 schema'd MCP tools, so the calling model gets parameters and guardrails instead of hand-writing filter graphs.
 - **Nothing blocks** — anything that encodes frames returns a job id immediately, with real progress parsed from ffmpeg's own output and a cancel that actually kills the subprocess.
 - **Zero setup** — finds your ffmpeg, or downloads a verified static build for your OS on first run. The Whisper and face models fetch themselves too.
 - **Captions that survive their own text** — a subtitle containing `Time: 12:30, [note]; it's 50%` would corrupt a naively built filter graph. Here it doesn't, and there's a test proving it.
@@ -42,7 +42,7 @@
 - **Renders whole timelines** — clips, transitions, overlays, captions and ducked audio tracks compile into a single ffmpeg pass.
 - **Two front doors, one backend** — the optional local UI shares the same job store, so it and your MCP client see and cancel each other's work.
 - **Can see what it edits** — extract a frame or a contact sheet, measure brightness, colour and loudness. Editing is a loop, so the server can check its own output rather than rendering blind.
-- **Tested where it counts** — 711 tests; the unit tests run with no ffmpeg installed at all.
+- **Tested where it counts** — 727 tests; the unit tests run with no ffmpeg installed at all.
 
 ## Quick start
 
@@ -99,6 +99,30 @@ job id — poll `job_status`, then `job_result`. `cancel_job` stops it mid-rende
 > `/mnt/user-data/uploads/clip.mov`. Paths must also sit under
 > `FFMPEG_MCP_ALLOWED_ROOTS`, which defaults to your home directory.
 
+## Projects
+
+Several sessions can share one server without mixing together. Name a project
+and everything that session does is filed under it:
+
+```jsonc
+set_project { "name": "dress-reel" }        // one session
+set_project { "name": "wedding-teaser" }    // another, same server
+```
+
+Jobs are stamped with the project, unspecified outputs land in
+`<workspace>/projects/<name>/`, and `list_jobs` shows only that project by
+default — so a busy shared queue stays readable. `project: "all"` spans them,
+and `list_projects` shows what exists with per-project counts.
+
+Long queues page rather than dumping everything:
+
+```jsonc
+list_jobs { "limit": 25, "offset": 50 }     // returns total and has_more
+```
+
+Workers still share the queue, so projects divide the bookkeeping without
+dividing the compute.
+
 ## How it works
 
 <p align="center">
@@ -140,6 +164,7 @@ frame looks worse than a slightly imperfect one that glides.
 | :-: | :--- | :--- |
 | 🎬 | **Core** | `probe_media` · `trim` · `concat` · `convert_format` · `transform` · `speed_ramp` · `list_capabilities` |
 | ⏱ | **Jobs** | `job_status` · `job_result` · `cancel_job` · `list_jobs` |
+| 🗂 | **Projects** | `set_project` · `list_projects` |
 | 🎨 | **Colour** | `color_grade` · `apply_lut` · `apply_curves` |
 | 💬 | **Text** | `burn_captions` · `text_overlay` · `build_srt` |
 | 🗣 | **Speech** | `transcribe_audio` · `auto_caption` · `translate_transcript` |
@@ -220,7 +245,7 @@ against a pinned SHA-256.
 ## Development
 
 ```bash
-uv run pytest                       # 711 tests
+uv run pytest                       # 727 tests
 uv run pytest -m "not integration"  # most need no ffmpeg
 uv run ruff check . && uv run ruff format --check .
 uv run mypy

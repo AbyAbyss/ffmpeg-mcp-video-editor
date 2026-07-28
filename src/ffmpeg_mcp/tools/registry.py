@@ -131,6 +131,7 @@ def load_all_tools() -> list[ToolSpec]:
         core,
         grading,
         jobs,
+        projects,
         resize,
         transcription,
         vision,

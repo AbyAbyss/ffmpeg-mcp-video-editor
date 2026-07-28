@@ -16,6 +16,7 @@ import pytest
 from ffmpeg_mcp.binaries import reset_binary_cache
 from ffmpeg_mcp.config import Settings, set_settings
 from ffmpeg_mcp.jobs.store import JobStore, reset_store
+from ffmpeg_mcp.projects import reset_active_project
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
@@ -60,10 +61,13 @@ def settings(workspace: Path) -> Iterator[Settings]:
     set_settings(configured)
     reset_store()
     reset_binary_cache()
+    reset_active_project()
     yield configured
     set_settings(None)
     reset_store()
     reset_binary_cache()
+    # Project selection is process state, so it must not leak between tests.
+    reset_active_project()
 
 
 @pytest.fixture

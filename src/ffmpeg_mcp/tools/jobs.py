@@ -51,7 +51,15 @@ class JobListArgs(StrictModel):
     """Arguments for listing jobs."""
 
     status: JobStatus | None = Field(default=None, description="Filter to one status.")
-    limit: int = Field(default=25, ge=1, le=200)
+    project: str | None = Field(
+        default=None,
+        description=(
+            "Which project to list. Defaults to the active one; pass 'all' to see "
+            "every project at once."
+        ),
+    )
+    limit: int = Field(default=25, ge=1, le=200, description="Page size.")
+    offset: int = Field(default=0, ge=0, description="How many jobs to skip, for paging.")
 
 
 class JobSummary(StrictModel):
@@ -63,13 +71,19 @@ class JobSummary(StrictModel):
     progress: float
     created_at: float
     message: str | None = None
+    project: str | None = None
 
 
 class JobListResult(StrictModel):
-    """A page of jobs plus queue-wide counts."""
+    """A page of jobs plus counts for the scope being listed."""
 
     jobs: list[JobSummary]
     counts: dict[str, int]
+    project: str = Field(description="The scope these results cover; 'all' spans projects.")
+    total: int = Field(description="Jobs matching the filter, ignoring this page.")
+    offset: int
+    limit: int
+    has_more: bool
 
 
 class CancelResult(StrictModel):
@@ -170,13 +184,22 @@ async def cancel_job(args: JobIdArgs) -> CancelResult:
 
 @tool("list_jobs", title="List jobs", phase=1, read_only=True)
 async def list_jobs(args: JobListArgs) -> JobListResult:
-    """List recent jobs, newest first, with queue-wide status counts.
+    """List jobs newest first, scoped to a project and returned a page at a time.
 
-    Useful for finding a job id you have lost track of, or for checking whether
-    the queue is backed up.
+    Defaults to the active project, so a long-running server shared by several
+    sessions does not bury your work in everyone else's. Pass project='all' to
+    see everything, and use offset with limit to page through a busy queue —
+    'total' and 'has_more' say whether there is another page.
     """
+    from ..projects import active_project
+
     store = get_store()
-    records = store.list_jobs(status=args.status, limit=args.limit)
+    scope = args.project or active_project()
+    selector = None if scope == "all" else scope
+    records = store.list_jobs(
+        status=args.status, project=selector, limit=args.limit, offset=args.offset
+    )
+    total = store.count_jobs(args.status, selector)
     return JobListResult(
         jobs=[
             JobSummary(
@@ -186,8 +209,14 @@ async def list_jobs(args: JobListArgs) -> JobListResult:
                 progress=r.progress,
                 created_at=r.created_at,
                 message=r.message,
+                project=r.project or "default",
             )
             for r in records
         ],
-        counts=store.counts_by_status(),
+        counts=store.counts_by_status(selector),
+        project=scope,
+        total=total,
+        offset=args.offset,
+        limit=args.limit,
+        has_more=args.offset + len(records) < total,
     )

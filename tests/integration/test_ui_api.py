@@ -432,3 +432,55 @@ class TestUpload:
         assert ".mp4" in body["suffixes"]
         assert ".sh" not in body["suffixes"]
         assert body["max_bytes"] > 0
+
+
+class TestProjectScoping:
+    """Two sessions on one server should not bury each other's jobs."""
+
+    def test_jobs_can_be_listed_per_project(
+        self, client: TestClient, settings: Settings, clip: Path
+    ) -> None:
+        from ffmpeg_mcp.jobs.store import JobStore
+
+        other = JobStore(settings)
+        other.create("trim", {"input_path": str(clip)}, project="wedding")
+        other.create("trim", {"input_path": str(clip)}, project="reel")
+        other.create("trim", {"input_path": str(clip)}, project="reel")
+
+        reel = client.get("/api/jobs?project=reel").json()
+        assert reel["total"] == 2
+        assert {j["project"] for j in reel["jobs"]} == {"reel"}
+        assert client.get("/api/jobs?project=wedding").json()["total"] == 1
+
+    def test_all_spans_projects(self, client: TestClient, settings: Settings, clip: Path) -> None:
+        from ffmpeg_mcp.jobs.store import JobStore
+
+        other = JobStore(settings)
+        other.create("trim", {}, project="a")
+        other.create("trim", {}, project="b")
+        assert client.get("/api/jobs?project=all").json()["total"] >= 2
+
+    def test_paging_reports_whether_more_remains(
+        self, client: TestClient, settings: Settings
+    ) -> None:
+        from ffmpeg_mcp.jobs.store import JobStore
+
+        other = JobStore(settings)
+        for _ in range(5):
+            other.create("trim", {}, project="paged")
+
+        first = client.get("/api/jobs?project=paged&limit=2&offset=0").json()
+        assert len(first["jobs"]) == 2
+        assert first["total"] == 5
+        assert first["has_more"] is True
+
+        last = client.get("/api/jobs?project=paged&limit=2&offset=4").json()
+        assert len(last["jobs"]) == 1
+        assert last["has_more"] is False
+
+    def test_projects_are_listed_with_counts(self, client: TestClient, settings: Settings) -> None:
+        from ffmpeg_mcp.jobs.store import JobStore
+
+        JobStore(settings).create("trim", {}, project="listed")
+        rows = {p["name"]: p for p in client.get("/api/projects").json()}
+        assert rows["listed"]["jobs"] == 1

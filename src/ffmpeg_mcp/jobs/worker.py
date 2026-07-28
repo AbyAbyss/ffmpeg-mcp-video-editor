@@ -270,10 +270,16 @@ def submit(tool: str, params: dict[str, Any], settings: Settings | None = None) 
     store = get_store(settings)
     if get_handler(tool) is None:
         raise ValueError(f"No handler registered for tool {tool!r}")
+    from ..projects import active_project
     from ..tools.registry import get_tool
 
     spec = get_tool(tool)
-    return store.create(tool, params, spec.schema_fingerprint() if spec else None)
+    return store.create(
+        tool,
+        params,
+        spec.schema_fingerprint() if spec else None,
+        project=active_project(),
+    )
 
 
 def status_of(job_id: str, settings: Settings | None = None) -> JobRecord:

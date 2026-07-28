@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     cancel_requested INTEGER NOT NULL DEFAULT 0,
     worker_pid       INTEGER,
     heartbeat_at     REAL,
-    schema_fingerprint TEXT
+    schema_fingerprint TEXT,
+    project          TEXT
 );
 CREATE INDEX IF NOT EXISTS jobs_status_created ON jobs (status, created_at);
 """
@@ -116,6 +117,8 @@ class JobStore:
             columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
             if "schema_fingerprint" not in columns:
                 conn.execute("ALTER TABLE jobs ADD COLUMN schema_fingerprint TEXT")
+            if "project" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN project TEXT")
         finally:
             conn.close()
 
@@ -136,6 +139,8 @@ class JobStore:
             outputs=json.loads(row["outputs"]),
             result=json.loads(row["result"]),
             error=JobError.model_validate(json.loads(error_raw)) if error_raw else None,
+            # sqlite3.Row has no __contains__, so membership goes via keys().
+            project=row["project"] if "project" in row.keys() else None,  # noqa: SIM118
             command=row["command"],
             message=row["message"],
             cancel_requested=bool(row["cancel_requested"]),
@@ -145,20 +150,37 @@ class JobStore:
     # -- writes ------------------------------------------------------------- #
 
     def create(
-        self, tool: str, params: dict[str, Any], schema_fingerprint: str | None = None
+        self,
+        tool: str,
+        params: dict[str, Any],
+        schema_fingerprint: str | None = None,
+        project: str | None = None,
     ) -> JobRecord:
         """Enqueue a new job and return its record."""
         job_id = uuid.uuid4().hex[:16]
         now = time.time()
         with self._cursor() as cursor:
             cursor.execute(
-                "INSERT INTO jobs (job_id, tool, status, created_at, params, schema_fingerprint) "
-                "VALUES (?,?,?,?,?,?)",
-                (job_id, tool, JobStatus.QUEUED.value, now, _dumps(params), schema_fingerprint),
+                "INSERT INTO jobs (job_id, tool, status, created_at, params, "
+                "schema_fingerprint, project) VALUES (?,?,?,?,?,?,?)",
+                (
+                    job_id,
+                    tool,
+                    JobStatus.QUEUED.value,
+                    now,
+                    _dumps(params),
+                    schema_fingerprint,
+                    project,
+                ),
             )
-        log.info("Job %s queued for tool %s", job_id, tool)
+        log.info("Job %s queued for tool %s (project %s)", job_id, tool, project or "-")
         return JobRecord(
-            job_id=job_id, tool=tool, status=JobStatus.QUEUED, created_at=now, params=params
+            job_id=job_id,
+            tool=tool,
+            status=JobStatus.QUEUED,
+            created_at=now,
+            params=params,
+            project=project,
         )
 
     def claim_next(self, worker_pid: int, known: dict[str, str] | None = None) -> JobRecord | None:
@@ -315,31 +337,73 @@ class JobStore:
             conn.close()
         return bool(row and row["cancel_requested"])
 
+    @staticmethod
+    def _filter(status: JobStatus | None, project: str | None) -> tuple[str, tuple[Any, ...]]:
+        """Build the WHERE clause shared by listing, counting and summarising."""
+        clauses: list[str] = []
+        values: list[Any] = []
+        if status is not None:
+            clauses.append("status = ?")
+            values.append(status.value)
+        if project is not None:
+            # Rows written before projects existed belong to the default one.
+            clauses.append("(project = ? OR (project IS NULL AND ? = 'default'))")
+            values += [project, project]
+        return ("WHERE " + " AND ".join(clauses)) if clauses else "", tuple(values)
+
     def list_jobs(
-        self, *, status: JobStatus | None = None, limit: int = 100, offset: int = 0
+        self,
+        *,
+        status: JobStatus | None = None,
+        project: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
     ) -> list[JobRecord]:
-        """List jobs newest first, optionally filtered by status."""
+        """List jobs newest first, optionally filtered by status and project."""
+        where, params = self._filter(status, project)
         conn = self._connect()
         try:
-            if status is None:
-                rows = conn.execute(
-                    "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (limit, offset),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (status.value, limit, offset),
-                ).fetchall()
+            rows = conn.execute(
+                f"SELECT * FROM jobs {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (*params, limit, offset),
+            ).fetchall()
         finally:
             conn.close()
         return [self._to_record(row) for row in rows]
 
-    def counts_by_status(self) -> dict[str, int]:
-        """Queue summary for the UI header."""
+    def count_jobs(self, status: JobStatus | None = None, project: str | None = None) -> int:
+        """How many jobs match, ignoring any page window."""
+        where, params = self._filter(status, project)
         conn = self._connect()
         try:
-            rows = conn.execute("SELECT status, COUNT(*) AS n FROM jobs GROUP BY status").fetchall()
+            row = conn.execute(f"SELECT COUNT(*) AS n FROM jobs {where}", params).fetchone()
+        finally:
+            conn.close()
+        return int(row["n"])
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        """Every project the store has seen, with counts and last activity."""
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT COALESCE(project, 'default') AS name, COUNT(*) AS jobs, "
+                "MAX(created_at) AS last_activity, "
+                "SUM(status = 'running') AS running, SUM(status = 'queued') AS queued, "
+                "SUM(status = 'done') AS done, SUM(status = 'failed') AS failed "
+                "FROM jobs GROUP BY name ORDER BY last_activity DESC"
+            ).fetchall()
+        finally:
+            conn.close()
+        return [dict(row) for row in rows]
+
+    def counts_by_status(self, project: str | None = None) -> dict[str, int]:
+        """Queue summary for the UI header, optionally scoped to one project."""
+        where, params = self._filter(None, project)
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                f"SELECT status, COUNT(*) AS n FROM jobs {where} GROUP BY status", params
+            ).fetchall()
         finally:
             conn.close()
         counts = {status.value: 0 for status in JobStatus}

@@ -344,3 +344,92 @@ class TestBuildSkew:
         assert failed.error.code == "incompatible_build"
         assert "Restart every ffmpeg-mcp server" in failed.error.message
         assert "validation_error" in failed.error.details
+
+
+class TestProjects:
+    """Parallel sessions need their own scope, or they bury each other's work."""
+
+    def test_jobs_are_stamped_with_their_project(self, store: JobStore) -> None:
+        record = store.create("trim", {}, project="wedding")
+        assert store.get(record.job_id).project == "wedding"
+
+    def test_listing_is_scoped_to_a_project(self, store: JobStore) -> None:
+        store.create("trim", {}, project="wedding")
+        store.create("trim", {}, project="reel")
+        store.create("trim", {}, project="reel")
+        assert len(store.list_jobs(project="reel")) == 2
+        assert len(store.list_jobs(project="wedding")) == 1
+        assert len(store.list_jobs()) == 3  # unscoped still sees everything
+
+    def test_pre_project_rows_belong_to_default(self, store: JobStore) -> None:
+        # Upgrading an existing store must not orphan its history.
+        store.create("trim", {})
+        assert len(store.list_jobs(project="default")) == 1
+        assert len(store.list_jobs(project="other")) == 0
+
+    def test_counts_are_scoped_too(self, store: JobStore) -> None:
+        store.create("trim", {}, project="a")
+        b = store.create("trim", {}, project="b")
+        store.finish(b.job_id, [], {})
+        assert store.counts_by_status("a")["queued"] == 1
+        assert store.counts_by_status("a")["done"] == 0
+        assert store.counts_by_status("b")["done"] == 1
+
+    def test_paging_walks_the_whole_list_without_repeats(self, store: JobStore) -> None:
+        for _ in range(7):
+            store.create("trim", {}, project="p")
+        seen: list[str] = []
+        for offset in (0, 3, 6):
+            seen += [j.job_id for j in store.list_jobs(project="p", limit=3, offset=offset)]
+        assert len(seen) == 7
+        assert len(set(seen)) == 7
+
+    def test_the_total_ignores_the_page_window(self, store: JobStore) -> None:
+        for _ in range(5):
+            store.create("trim", {}, project="p")
+        assert len(store.list_jobs(project="p", limit=2)) == 2
+        assert store.count_jobs(project="p") == 5
+
+    def test_projects_are_listed_with_their_counts(self, store: JobStore) -> None:
+        store.create("trim", {}, project="alpha")
+        store.create("trim", {}, project="beta")
+        store.create("trim", {}, project="beta")
+        by_name = {p["name"]: p for p in store.list_projects()}
+        assert by_name["alpha"]["jobs"] == 1
+        assert by_name["beta"]["jobs"] == 2
+
+
+class TestProjectNames:
+    def test_ordinary_names_are_accepted(self) -> None:
+        from ffmpeg_mcp.projects import validate_project_name
+
+        for name in ("reel", "wedding-2026", "client_a", "v1.2"):
+            assert validate_project_name(name) == name
+
+    def test_a_name_cannot_escape_its_directory(self) -> None:
+        # The name becomes a directory component, so this is the important case.
+        from ffmpeg_mcp.errors import InvalidParameterError
+        from ffmpeg_mcp.projects import validate_project_name
+
+        for attack in ("../escape", "a/b", "..", "/abs", "a\\b", ".hidden"):
+            with pytest.raises(InvalidParameterError):
+                validate_project_name(attack)
+
+    def test_empty_and_overlong_names_are_rejected(self) -> None:
+        from ffmpeg_mcp.errors import InvalidParameterError
+        from ffmpeg_mcp.projects import validate_project_name
+
+        with pytest.raises(InvalidParameterError):
+            validate_project_name("   ")
+        with pytest.raises(InvalidParameterError):
+            validate_project_name("x" * 65)
+
+    def test_switching_changes_where_new_jobs_are_filed(self, store: JobStore) -> None:
+        from ffmpeg_mcp.projects import active_project, reset_active_project, set_active_project
+
+        try:
+            set_active_project("scoped")
+            assert active_project() == "scoped"
+        finally:
+            reset_active_project()
+        assert active_project() == "default"

@@ -204,7 +204,13 @@ def validate_output_path(
     """
     settings = settings or get_settings()
     if raw is None:
-        directory = settings.jobs_dir / (job_id or uuid.uuid4().hex)
+        # Unspecified outputs go under the active project so two sessions
+        # editing different videos do not pile into one directory.
+        from .projects import active_project
+
+        directory = (
+            settings.workspace / "projects" / active_project() / (job_id or uuid.uuid4().hex)
+        )
         directory.mkdir(parents=True, exist_ok=True)
         return directory / suggested_name
     path = resolve_within_roots(raw, settings)

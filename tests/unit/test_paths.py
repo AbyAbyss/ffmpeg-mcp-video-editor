@@ -84,10 +84,22 @@ class TestInputValidation:
 
 
 class TestOutputValidation:
-    def test_none_falls_back_to_the_job_directory(self, settings: Settings) -> None:
+    def test_none_falls_back_to_the_projects_job_directory(self, settings: Settings) -> None:
+        # Unspecified outputs are scoped by project so parallel sessions do not
+        # pile into one directory.
         out = validate_output_path(None, suggested_name="a.mp4", job_id="job1", settings=settings)
-        assert out == settings.jobs_dir / "job1" / "a.mp4"
+        assert out == settings.workspace / "projects" / "default" / "job1" / "a.mp4"
         assert out.parent.is_dir()
+
+    def test_the_output_directory_follows_the_active_project(self, settings: Settings) -> None:
+        from ffmpeg_mcp.projects import reset_active_project, set_active_project
+
+        try:
+            set_active_project("reel")
+            out = validate_output_path(None, suggested_name="a.mp4", job_id="j", settings=settings)
+            assert out.parent == settings.workspace / "projects" / "reel" / "j"
+        finally:
+            reset_active_project()
 
     def test_parent_directory_is_created(self, settings: Settings) -> None:
         out = validate_output_path(
