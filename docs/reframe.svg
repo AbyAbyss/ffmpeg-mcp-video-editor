@@ -1,0 +1,114 @@
+<svg width="1120" height="360" viewBox="0 0 1120 360" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="rbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15161C"/>
+      <stop offset="1" stop-color="#08090C"/>
+    </linearGradient>
+    <linearGradient id="shot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2E6FD4"/>
+      <stop offset="0.5" stop-color="#7A4FC4"/>
+      <stop offset="1" stop-color="#D4530A"/>
+    </linearGradient>
+    <linearGradient id="shotBlur" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2E6FD4"/>
+      <stop offset="0.5" stop-color="#7A4FC4"/>
+      <stop offset="1" stop-color="#D4530A"/>
+    </linearGradient>
+    <filter id="blurred" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <clipPath id="cCover"><rect x="0" y="0" width="112" height="200" rx="7"/></clipPath>
+    <clipPath id="cBlur"><rect x="0" y="0" width="112" height="200" rx="7"/></clipPath>
+  </defs>
+
+  <rect width="1120" height="360" rx="18" fill="url(#rbg)"/>
+
+  <text x="40" y="42" font-size="13" font-weight="700" letter-spacing="1.3" fill="#6E727D">ONE SOURCE &#183; FOUR WAYS TO FIT</text>
+
+  <!-- source 16:9 -->
+  <g transform="translate(40,74)">
+    <rect width="300" height="169" rx="9" fill="url(#shot)"/>
+    <circle cx="150" cy="72" r="30" fill="#FFFFFF" fill-opacity="0.9"/>
+    <path d="M150 108 q-46 0 -60 46 h120 q-14 -46 -60 -46 z" fill="#FFFFFF" fill-opacity="0.9"/>
+    <rect width="300" height="169" rx="9" fill="none" stroke="#FFFFFF" stroke-opacity="0.16"/>
+    <text x="0" y="192" font-size="12.5" font-weight="700" fill="#E7E9EE">Source &#183; 1920&#215;1080</text>
+    <text x="0" y="211" font-size="11.5" fill="#8B909B">16:9 landscape</text>
+  </g>
+
+  <path d="M362 158 L406 158" stroke="#E8630A" stroke-width="2" fill="none"/>
+  <path d="M400 152 L410 158 L400 164 z" fill="#E8630A"/>
+  <text x="384" y="140" font-size="11" font-weight="700" fill="#E8630A" text-anchor="middle">9:16</text>
+
+  <!-- cover -->
+  <g transform="translate(440,60)">
+    <g clip-path="url(#cCover)">
+      <rect width="112" height="200" fill="#000"/>
+      <!-- zoomed to fill: subject stays, edges lost -->
+      <g transform="translate(-122,0) scale(1.185)">
+        <rect width="300" height="169" fill="url(#shot)"/>
+        <circle cx="150" cy="72" r="30" fill="#FFFFFF" fill-opacity="0.9"/>
+        <path d="M150 108 q-46 0 -60 46 h120 q-14 -46 -60 -46 z" fill="#FFFFFF" fill-opacity="0.9"/>
+      </g>
+    </g>
+    <rect width="112" height="200" rx="7" fill="none" stroke="#E8630A" stroke-opacity="0.55"/>
+    <text x="0" y="222" font-size="12.5" font-weight="700" fill="#FFA469">cover</text>
+    <text x="0" y="240" font-size="11" fill="#8B909B">fills; edges cropped</text>
+    <text x="0" y="256" font-size="11" fill="#6E727D">default &#183; focus= picks side</text>
+  </g>
+
+  <!-- contain -->
+  <g transform="translate(600,60)">
+    <rect width="112" height="200" rx="7" fill="#000"/>
+    <g transform="translate(0,68)">
+      <rect width="112" height="63" fill="url(#shot)"/>
+      <circle cx="56" cy="27" r="11" fill="#FFFFFF" fill-opacity="0.9"/>
+      <path d="M56 41 q-17 0 -22 17 h44 q-5 -17 -22 -17 z" fill="#FFFFFF" fill-opacity="0.9"/>
+    </g>
+    <rect width="112" height="200" rx="7" fill="none" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="0" y="222" font-size="12.5" font-weight="700" fill="#E7E9EE">contain</text>
+    <text x="0" y="240" font-size="11" fill="#8B909B">whole frame kept</text>
+    <text x="0" y="256" font-size="11" fill="#6E727D">solid bars</text>
+  </g>
+
+  <!-- blur -->
+  <g transform="translate(760,60)">
+    <g clip-path="url(#cBlur)">
+      <rect width="112" height="200" fill="#000"/>
+      <g filter="url(#blurred)" transform="translate(-122,0) scale(1.185)">
+        <rect width="300" height="169" fill="url(#shotBlur)"/>
+        <circle cx="150" cy="72" r="30" fill="#FFFFFF" fill-opacity="0.75"/>
+      </g>
+      <g transform="translate(0,68)">
+        <rect width="112" height="63" fill="url(#shot)"/>
+        <circle cx="56" cy="27" r="11" fill="#FFFFFF" fill-opacity="0.9"/>
+        <path d="M56 41 q-17 0 -22 17 h44 q-5 -17 -22 -17 z" fill="#FFFFFF" fill-opacity="0.9"/>
+      </g>
+    </g>
+    <rect width="112" height="200" rx="7" fill="none" stroke="#FFFFFF" stroke-opacity="0.18"/>
+    <text x="0" y="222" font-size="12.5" font-weight="700" fill="#E7E9EE">blur</text>
+    <text x="0" y="240" font-size="11" fill="#8B909B">whole frame kept</text>
+    <text x="0" y="256" font-size="11" fill="#6E727D">blurred zoom behind</text>
+  </g>
+
+  <!-- track_and_crop -->
+  <g transform="translate(920,60)">
+    <g clip-path="url(#cCover)">
+      <rect width="112" height="200" fill="#000"/>
+      <g transform="translate(-160,0) scale(1.185)">
+        <rect width="300" height="169" fill="url(#shot)"/>
+        <circle cx="182" cy="72" r="30" fill="#FFFFFF" fill-opacity="0.9"/>
+        <path d="M182 108 q-46 0 -60 46 h120 q-14 -46 -60 -46 z" fill="#FFFFFF" fill-opacity="0.9"/>
+      </g>
+    </g>
+    <rect x="18" y="42" width="76" height="76" rx="8" fill="none" stroke="#E8630A" stroke-width="2"/>
+    <path d="M56 34 L56 22 M56 126 L56 138" stroke="#E8630A" stroke-width="2"/>
+    <rect width="112" height="200" rx="7" fill="none" stroke="#E8630A" stroke-opacity="0.55"/>
+    <text x="0" y="222" font-size="12.5" font-weight="700" fill="#FFA469">track_and_crop</text>
+    <text x="0" y="240" font-size="11" fill="#8B909B">follows the face</text>
+    <text x="0" y="256" font-size="11" fill="#6E727D">smoothed crop path</text>
+  </g>
+
+  <text x="40" y="330" font-size="11.5" fill="#6E727D">
+    <tspan font-weight="700" fill="#9AA0AB">resize_video</tspan> takes a preset (reel &#183; tiktok &#183; youtube_short &#183; instagram_square &#8230;), an aspect_ratio, or explicit dimensions.
+  </text>
+</svg>

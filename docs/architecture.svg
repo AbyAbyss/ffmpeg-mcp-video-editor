@@ -1,0 +1,101 @@
+<svg width="1120" height="430" viewBox="0 0 1120 430" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="abg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15161C"/>
+      <stop offset="1" stop-color="#08090C"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6E727D"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#E8630A"/>
+    </marker>
+  </defs>
+
+  <rect width="1120" height="430" rx="18" fill="url(#abg)"/>
+
+  <!-- front doors -->
+  <text x="150" y="40" font-size="11.5" font-weight="700" letter-spacing="1.4" fill="#6E727D" text-anchor="middle">TWO FRONT DOORS</text>
+
+  <g transform="translate(40,58)">
+    <rect width="220" height="72" rx="13" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.13"/>
+    <text x="20" y="30" font-size="14.5" font-weight="700" fill="#E7E9EE">MCP client</text>
+    <text x="20" y="52" font-size="12" fill="#8B909B">Claude Code · Desktop · Cursor</text>
+  </g>
+
+  <g transform="translate(40,158)">
+    <rect width="220" height="72" rx="13" fill="#E8630A" fill-opacity="0.10" stroke="#E8630A" stroke-opacity="0.42"/>
+    <text x="20" y="30" font-size="14.5" font-weight="700" fill="#FFA469">Local UI</text>
+    <text x="20" y="52" font-size="12" fill="#8B909B">jobs · preview · timeline</text>
+  </g>
+
+
+  <!-- shared store -->
+  <g transform="translate(340,88)">
+    <rect width="212" height="152" rx="15" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.16"/>
+    <text x="106" y="34" font-size="14.5" font-weight="700" fill="#E7E9EE" text-anchor="middle">Shared job store</text>
+    <text x="106" y="55" font-size="11.5" fill="#8B909B" text-anchor="middle">SQLite in the workspace</text>
+    <g transform="translate(22,72)" font-size="11.5" fill="#9AA0AB">
+      <circle cx="4" cy="-4" r="3" fill="#E8630A"/><text x="16" y="0">atomic claim</text>
+      <circle cx="4" cy="22" r="3" fill="#E8630A"/><text x="16" y="26">progress + status</text>
+      <circle cx="4" cy="48" r="3" fill="#E8630A"/><text x="16" y="52">cooperative cancel</text>
+    </g>
+  </g>
+
+  <!-- workers -->
+  <g transform="translate(636,88)">
+    <rect width="180" height="152" rx="15" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.13"/>
+    <text x="90" y="34" font-size="14.5" font-weight="700" fill="#E7E9EE" text-anchor="middle">Worker pool</text>
+    <text x="90" y="55" font-size="11.5" fill="#8B909B" text-anchor="middle">async, per process</text>
+    <g transform="translate(24,72)">
+      <rect width="132" height="24" rx="7" fill="#FFFFFF" fill-opacity="0.06"/>
+      <rect width="86" height="24" rx="7" fill="#E8630A" fill-opacity="0.55"/>
+      <text x="66" y="16" font-size="10.5" font-weight="600" fill="#F2E4DA" text-anchor="middle">worker 0</text>
+      <rect y="34" width="132" height="24" rx="7" fill="#FFFFFF" fill-opacity="0.06"/>
+      <rect y="34" width="42" height="24" rx="7" fill="#E8630A" fill-opacity="0.55"/>
+      <text x="66" y="50" font-size="10.5" font-weight="600" fill="#F2E4DA" text-anchor="middle">worker 1</text>
+    </g>
+  </g>
+
+  <!-- engines -->
+  <g transform="translate(896,58)">
+    <rect width="184" height="60" rx="12" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.13"/>
+    <text x="18" y="26" font-size="13.5" font-weight="700" fill="#E7E9EE">ffmpeg</text>
+    <text x="18" y="45" font-size="11" fill="#8B909B">one shared exec path</text>
+  </g>
+  <g transform="translate(896,132)">
+    <rect width="184" height="60" rx="12" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.13"/>
+    <text x="18" y="26" font-size="13.5" font-weight="700" fill="#E7E9EE">faster-whisper</text>
+    <text x="18" y="45" font-size="11" fill="#8B909B">transcribe · translate</text>
+  </g>
+  <g transform="translate(896,206)">
+    <rect width="184" height="60" rx="12" fill="#FFFFFF" fill-opacity="0.05" stroke="#FFFFFF" stroke-opacity="0.13"/>
+    <text x="18" y="26" font-size="13.5" font-weight="700" fill="#E7E9EE">MediaPipe / OpenCV</text>
+    <text x="18" y="45" font-size="11" fill="#8B909B">detect · track · blur</text>
+  </g>
+
+  <!-- flows -->
+  <g stroke="#6E727D" stroke-width="1.6" fill="none" marker-end="url(#arrow)">
+    <path d="M264 94 L334 132"/>
+    <path d="M264 194 L334 176"/>
+    <path d="M556 164 L630 164"/>
+    <path d="M820 150 L890 100"/>
+    <path d="M820 164 L890 164"/>
+    <path d="M820 178 L890 228"/>
+  </g>
+
+  <!-- cancel path, the interesting one -->
+  <path d="M446 248 L446 300 L150 300 L150 236" stroke="#E8630A" stroke-width="1.6" fill="none"
+        stroke-dasharray="5 4" marker-end="url(#arrowOrange)"/>
+  <text x="446" y="322" font-size="11.5" font-weight="600" fill="#E8630A" text-anchor="middle">
+    either side can cancel the other&#8217;s job
+  </text>
+
+  <!-- workspace -->
+  <g transform="translate(340,346)">
+    <rect width="740" height="58" rx="13" fill="#FFFFFF" fill-opacity="0.04" stroke="#FFFFFF" stroke-opacity="0.11"/>
+    <text x="22" y="25" font-size="13.5" font-weight="700" fill="#E7E9EE">Workspace</text>
+    <text x="22" y="44" font-size="11.5" fill="#8B909B">outputs &#183; uploads &#183; cached binaries &#183; models &#8212; every path checked against an allowlist</text>
+  </g>
+  <path d="M706 246 L706 340" stroke="#6E727D" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+</svg>
