@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/tools-32-1b1b1b" alt="32 MCP tools">
   <img src="https://img.shields.io/badge/tests-651-22c55e" alt="651 tests">
   <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-555" alt="Platforms">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-3da639" alt="License: MIT"></a>
 </p>
 
 <p align="center">
@@ -24,7 +25,8 @@
   <a href="#reframing-for-reels-and-shorts">Reframing</a> &nbsp;·&nbsp;
   <a href="#the-tools">Tools</a> &nbsp;·&nbsp;
   <a href="#the-local-ui">Local UI</a> &nbsp;·&nbsp;
-  <a href="#security">Security</a>
+  <a href="#security">Security</a> &nbsp;·&nbsp;
+  <a href="#license">License</a>
 </p>
 
 ---
@@ -215,3 +217,15 @@ cd ui-src && npm install && npm run build   # emits into src/ffmpeg_mcp/ui/stati
 `blur_faces` covers up to 12 tracked faces and says so when it truncates. A
 missed detection means an unblurred face — review the output before publishing
 anything sensitive.
+
+## License
+
+[MIT](LICENSE) © AbyAbyss.
+
+ffmpeg itself is separately licensed, and the static builds this server can
+download for you are GPL-configured. Those run as a **separate process** that
+this project invokes over a command line — it links no ffmpeg code — so the MIT
+terms above cover this codebase only. If you redistribute a bundle that ships an
+ffmpeg binary alongside it, check that binary's own terms. Point
+`FFMPEG_MCP_FFMPEG_PATH` at an LGPL build if you would rather avoid GPL
+components entirely.
