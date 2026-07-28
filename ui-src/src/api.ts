@@ -143,6 +143,30 @@ export async function listFiles(directory?: string): Promise<MediaFile[]> {
   return unwrap(await fetch(`/api/files${query}`, { headers: headers() }));
 }
 
+export interface UploadAccepts {
+  suffixes: string[];
+  max_bytes: number;
+}
+
+export async function getUploadAccepts(): Promise<UploadAccepts> {
+  return unwrap(await fetch("/api/upload/accepts", { headers: headers() }));
+}
+
+/**
+ * Send files to the workspace.
+ *
+ * Lets the UI work on media from anywhere on the machine without the user
+ * first copying it under an allowed root. The Content-Type header is
+ * deliberately omitted so the browser sets the multipart boundary itself.
+ */
+export async function uploadFiles(files: File[]): Promise<MediaFile[]> {
+  const body = new FormData();
+  for (const file of files) body.append("files", file);
+  const init: RequestInit = { method: "POST", body };
+  if (token) init.headers = { "x-auth-token": token };
+  return unwrap(await fetch("/api/upload", init));
+}
+
 /** URL the <video> element loads; the server honours Range so seeking works. */
 export function mediaUrl(path: string): string {
   const query = new URLSearchParams({ path });

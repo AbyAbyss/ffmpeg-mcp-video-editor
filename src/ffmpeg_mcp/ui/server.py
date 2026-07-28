@@ -21,7 +21,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -35,6 +45,7 @@ from ..models import JobStatus
 from ..paths import resolve_within_roots
 from ..tools.registry import ToolSpec, get_tool, load_all_tools
 from .media import serve_media
+from .uploads import UPLOAD_SUFFIXES, store_upload
 
 log = logging.getLogger("ffmpeg_mcp.ui")
 
@@ -280,6 +291,38 @@ def create_app(settings: Settings | None = None, token: str | None = None) -> Fa
             )
         found.sort(key=lambda f: f.modified_at, reverse=True)
         return found
+
+    @app.post("/api/upload", dependencies=[Depends(require_token)])
+    async def upload(files: list[UploadFile] = File(...)) -> list[FileView]:
+        """Take files from the browser into the workspace's uploads directory.
+
+        Lets the UI work on media from anywhere on the machine without the user
+        first copying it under an allowed root by hand. Filenames are rebuilt
+        rather than trusted, and the size cap is applied while streaming.
+        """
+        current = state()
+        stored: list[FileView] = []
+        for item in files:
+            path = await asyncio.to_thread(store_upload, item, current.settings)
+            stat = path.stat()
+            stored.append(
+                FileView(
+                    path=str(path),
+                    name=path.name,
+                    size_bytes=stat.st_size,
+                    modified_at=stat.st_mtime,
+                    kind=_classify(path),
+                )
+            )
+        return stored
+
+    @app.get("/api/upload/accepts", dependencies=[Depends(require_token)])
+    async def upload_accepts() -> dict[str, Any]:
+        """What the upload endpoint will take, for the browser's file picker."""
+        return {
+            "suffixes": sorted(UPLOAD_SUFFIXES),
+            "max_bytes": state().settings.max_input_bytes,
+        }
 
     @app.get("/api/media", dependencies=[Depends(require_token)])
     async def media(request: Request, path: str = Query(...)) -> Response:

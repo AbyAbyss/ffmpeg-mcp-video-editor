@@ -138,8 +138,12 @@ class TestJobs:
             "/api/tools/trim", json={"input_path": str(clip), "start": 0.5, "end": 1.5}
         ).json()
         body = client.get(f"/api/jobs/{submission['job_id']}").json()
-        assert body["status"] == "queued"
+        # The UI runs its own worker pool, so a freshly queued job may already
+        # have started. What matters here is that the request was recorded
+        # faithfully and the job is in some valid lifecycle state.
         assert body["params"]["start"] == 0.5
+        assert body["params"]["end"] == 1.5
+        assert body["status"] in {"queued", "running", "done"}
 
     def test_an_unknown_job_is_an_error(self, client: TestClient) -> None:
         assert client.get("/api/jobs/does-not-exist").status_code == 400
@@ -334,3 +338,97 @@ def test_the_ui_does_not_need_the_mcp_server_running(
         assert standalone.get("/api/health").json()["status"] == "ok"
         assert standalone.get("/api/tools").status_code == 200
         assert len(standalone.get("/api/files").json()) >= 1
+
+
+class TestUpload:
+    def test_a_file_is_taken_into_the_workspace(
+        self, client: TestClient, settings: Settings, sample_video: Path
+    ) -> None:
+        response = client.post(
+            "/api/upload",
+            files={"files": ("holiday.mp4", sample_video.read_bytes(), "video/mp4")},
+        )
+        assert response.status_code == 200
+        entry = response.json()[0]
+        assert Path(entry["path"]).parent == settings.uploads_dir
+        assert entry["kind"] == "video"
+        assert entry["size_bytes"] == sample_video.stat().st_size
+
+    def test_an_uploaded_file_is_immediately_usable_by_a_tool(
+        self, client: TestClient, sample_video: Path
+    ) -> None:
+        # The whole point: media from outside the allowed roots becomes editable.
+        uploaded = client.post(
+            "/api/upload",
+            files={"files": ("holiday.mp4", sample_video.read_bytes(), "video/mp4")},
+        ).json()[0]
+        probe = client.post("/api/tools/probe_media", json={"input_path": uploaded["path"]})
+        assert probe.status_code == 200
+        assert probe.json()["duration"] == pytest.approx(3.0, abs=0.2)
+
+    def test_an_uploaded_file_shows_up_in_the_file_listing(
+        self, client: TestClient, sample_video: Path
+    ) -> None:
+        uploaded = client.post(
+            "/api/upload", files={"files": ("clip.mp4", sample_video.read_bytes(), "video/mp4")}
+        ).json()[0]
+        assert uploaded["path"] in {f["path"] for f in client.get("/api/files").json()}
+
+    def test_several_files_upload_at_once(
+        self, client: TestClient, sample_video: Path, sample_image: Path
+    ) -> None:
+        response = client.post(
+            "/api/upload",
+            files=[
+                ("files", ("a.mp4", sample_video.read_bytes(), "video/mp4")),
+                ("files", ("b.png", sample_image.read_bytes(), "image/png")),
+            ],
+        )
+        assert [entry["kind"] for entry in response.json()] == ["video", "image"]
+
+    def test_a_traversing_filename_cannot_escape_the_uploads_directory(
+        self, client: TestClient, settings: Settings, sample_video: Path
+    ) -> None:
+        response = client.post(
+            "/api/upload",
+            files={"files": ("../../../../tmp/pwned.mp4", sample_video.read_bytes(), "video/mp4")},
+        )
+        assert response.status_code == 200
+        written = Path(response.json()[0]["path"])
+        assert written.parent == settings.uploads_dir
+        assert not Path("/tmp/pwned.mp4").exists()
+
+    def test_an_executable_extension_is_refused(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/upload", files={"files": ("evil.sh", b"#!/bin/sh\nrm -rf /", "text/x-sh")}
+        )
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "invalid_parameter"
+
+    def test_an_oversized_upload_is_refused(self, workspace: Path, sample_video: Path) -> None:
+        from ..conftest import make_settings
+
+        tight = make_settings(workspace, max_input_bytes=64)
+        tight.ensure_dirs()
+        with TestClient(create_app(tight, token=None)) as tight_client:
+            response = tight_client.post(
+                "/api/upload",
+                files={"files": ("big.mp4", sample_video.read_bytes(), "video/mp4")},
+            )
+            assert response.status_code == 400
+            assert response.json()["error"]["code"] == "file_too_large"
+            assert list(tight.uploads_dir.iterdir()) == []
+
+    def test_upload_requires_a_token_when_one_is_set(
+        self, secured_client: TestClient, sample_video: Path
+    ) -> None:
+        response = secured_client.post(
+            "/api/upload", files={"files": ("a.mp4", sample_video.read_bytes(), "video/mp4")}
+        )
+        assert response.status_code == 401
+
+    def test_the_accepted_types_are_advertised(self, client: TestClient) -> None:
+        body = client.get("/api/upload/accepts").json()
+        assert ".mp4" in body["suffixes"]
+        assert ".sh" not in body["suffixes"]
+        assert body["max_bytes"] > 0

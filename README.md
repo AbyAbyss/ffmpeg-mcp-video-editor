@@ -128,6 +128,10 @@ vision tool and verified against a pinned SHA-256.
   are never logged.
 - The UI is the same trust boundary as the MCP server. Bound to loopback it runs
   unauthenticated; bound to any other address it generates and requires a token.
+- Uploads are the one place a client-chosen name becomes a path, so the name is
+  rebuilt from scratch: the directory component is discarded (`../../etc/passwd`
+  becomes `passwd`), the stem is reduced to `[A-Za-z0-9._-]`, and the extension
+  must be a media type the tools actually read.
 
 ## The local UI
 
@@ -137,6 +141,11 @@ side can cancel it — cancellation is a cooperative flag the owning worker pick
 up, so it works across processes.
 
 - **Jobs** — live queue with progress bars, pushed over a WebSocket, and cancel.
+- **Upload** — drag media in from anywhere on the machine, or click to browse.
+  Files land in `<workspace>/uploads` and become editable immediately, so you do
+  not have to copy them under an allowed root by hand. Filenames are rebuilt
+  rather than trusted, the extension must be one the tools handle, and the size
+  cap is applied while streaming.
 - **Preview** — plays inputs and outputs in-browser with a before/after
   comparison whose two players stay in step.
 - **Tools** — a form for every tool, generated from its JSON schema.

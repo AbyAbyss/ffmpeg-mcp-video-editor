@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import interact from "interactjs";
 import { callTool, listFiles, mediaUrl, type MediaFile } from "../api";
 import { formatDuration } from "../format";
+import FileDrop from "./FileDrop";
 
 const TRANSITIONS = [
   "none",
@@ -390,6 +391,10 @@ export default function TimelineEditor({ onQueued }: { onQueued: () => void }) {
       <div className="grid-side">
         <div className="panel">
           <h2 className="panel-title">Media</h2>
+          <FileDrop
+            compact
+            onUploaded={(added) => setFiles((current) => [...added, ...current])}
+          />
           <div className="file-list">
             {files
               .filter((file) => file.kind === "video" || file.kind === "audio")

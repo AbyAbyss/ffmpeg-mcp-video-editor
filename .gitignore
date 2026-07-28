@@ -10,6 +10,7 @@ __pycache__/
 # Frontend
 ui-src/node_modules/
 ui-src/.vite/
+ui-src/tsconfig.tsbuildinfo
 
 # Generated test fixtures (regenerated on demand by the test suite)
 tests/fixtures/

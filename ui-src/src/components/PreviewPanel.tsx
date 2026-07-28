@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listFiles, mediaUrl, type Job, type MediaFile } from "../api";
 import { basename, formatBytes } from "../format";
+import FileDrop from "./FileDrop";
 
 interface Props {
   jobs: Job[];
@@ -108,6 +109,12 @@ export default function PreviewPanel({ jobs, selectedJob }: Props) {
           </button>
         </h2>
         {error && <div className="error-banner">{error}</div>}
+        <FileDrop
+          onUploaded={(added) => {
+            void refresh();
+            if (added[0]) setChosen(added[0].path);
+          }}
+        />
         {files.length === 0 ? (
           <div className="empty">No media in the workspace yet.</div>
         ) : (

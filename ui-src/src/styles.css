@@ -852,3 +852,41 @@ details.raw summary {
 details.raw pre {
   margin-top: 8px;
 }
+
+/* -------------------------------------------------------------- dropzone */
+
+.dropzone {
+  padding: 16px 12px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.dropzone:hover {
+  color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.dropzone[data-over="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dropzone[data-compact="true"] {
+  padding: 10px;
+  font-size: 11px;
+}
+
+.drop-error {
+  margin-top: 7px;
+  color: var(--bad);
+  font-size: 11px;
+  line-height: 1.4;
+}
