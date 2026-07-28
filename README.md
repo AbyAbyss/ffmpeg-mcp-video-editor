@@ -50,18 +50,35 @@ uv sync --all-extras          # core + Whisper + vision + UI
 uv run ffmpeg-mcp-server
 ```
 
-Register it with your MCP client:
+Register it with your MCP client. Rather than hand-editing paths, print the
+block with your real ones already filled in:
 
-```json
-{
-  "mcpServers": {
-    "ffmpeg-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/ffmpeg-mcp", "ffmpeg-mcp-server"]
-    }
-  }
-}
+```bash
+printf '{\n  "mcpServers": {\n    "ffmpeg-mcp": {\n      "command": "%s",\n      "args": ["run", "--directory", "%s", "ffmpeg-mcp-server"]\n    }\n  }\n}\n' "$(command -v uv)" "$PWD"
 ```
+
+Paste the result into your client's MCP config, then restart it. Both paths must
+be **absolute**: a GUI app does not inherit your shell's `PATH`, and it launches
+the server from an unrelated working directory.
+
+<details>
+<summary>It says <code>error: No such file or directory (os error 2)</code></summary>
+
+<br>
+
+That is `uv` failing before the server ever starts, and it almost always means
+the `--directory` path does not exist — most often a placeholder that was pasted
+verbatim. Run the command above to get the correct one. You can check it
+directly with:
+
+```bash
+uv run --directory /your/path ffmpeg-mcp-server   # should print startup logs, not exit
+```
+
+If `uv` itself is not found, use its absolute path (`command -v uv`) as
+`"command"`.
+
+</details>
 
 Then just ask for what you want:
 
