@@ -222,6 +222,15 @@ class EncodeOptions(StrictModel):
     video_bitrate: str | None = Field(default=None, description="e.g. '5M'. Overrides crf.")
     audio_bitrate: str | None = Field(default="192k")
     pix_fmt: str | None = "yuv420p"
+    color_range: Literal["tv", "pc"] | None = Field(
+        default="tv",
+        description=(
+            "Output colour range. 'tv' (limited) is what players and social "
+            "platforms expect; phone footage is often full-range, which encodes "
+            "as yuvj420p and is a common cause of washed-out or crushed levels "
+            "after upload. Set null to preserve whatever the source used."
+        ),
+    )
     fps: float | None = None
     extra_args: list[str] = Field(
         default_factory=list, description="Escape hatch: raw ffmpeg output args."

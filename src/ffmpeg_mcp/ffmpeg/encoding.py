@@ -54,6 +54,12 @@ def video_encode_args(options: EncodeOptions) -> list[str]:
         args += ["-preset", options.preset]
     if options.pix_fmt:
         args += ["-pix_fmt", options.pix_fmt]
+    if options.color_range:
+        # Without this, a full-range source (most phone footage) comes out as
+        # yuvj420p even though yuv420p was asked for: the pix_fmt request is
+        # silently not honoured. ffmpeg converts the levels here, it does not
+        # merely re-tag them.
+        args += ["-color_range", options.color_range]
     if options.fps:
         args += ["-r", str(options.fps)]
     return args

@@ -268,3 +268,26 @@ class TestVersionParsing:
     )
     def test_major_version_extraction(self, banner: str, expected: int | None) -> None:
         assert parse_major_version(banner) == expected
+
+
+class TestColourRange:
+    """A requested pix_fmt has to actually be honoured.
+
+    Phone footage is commonly full-range. Encoding it without pinning the range
+    yields yuvj420p despite `-pix_fmt yuv420p`, which is the usual reason a clip
+    looks washed out or crushed after upload.
+    """
+
+    def test_limited_range_is_pinned_by_default(self) -> None:
+        args = video_encode_args(EncodeOptions())
+        assert args[args.index("-color_range") + 1] == "tv"
+
+    def test_the_range_can_be_left_alone(self) -> None:
+        assert "-color_range" not in video_encode_args(EncodeOptions(color_range=None))
+
+    def test_full_range_can_be_asked_for_explicitly(self) -> None:
+        args = video_encode_args(EncodeOptions(color_range="pc"))
+        assert args[args.index("-color_range") + 1] == "pc"
+
+    def test_a_stream_copy_gains_no_range_flag(self) -> None:
+        assert video_encode_args(EncodeOptions(video_codec="copy")) == ["-c:v", "copy"]
