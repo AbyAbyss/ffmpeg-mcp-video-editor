@@ -17,3 +17,7 @@ tests/fixtures/
 
 # Local workspace
 .ffmpeg-mcp/
+
+# Editor and OS cruft
+.DS_Store
+.claude/settings.local.json
