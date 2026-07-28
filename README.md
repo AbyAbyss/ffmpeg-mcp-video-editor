@@ -92,6 +92,12 @@ auto_caption    →  job b71c…  ▸ done   interview_reframed_captioned.mp4  +
 `probe_media` and `list_capabilities` answer instantly. Everything else returns a
 job id — poll `job_status`, then `job_result`. `cancel_job` stops it mid-render.
 
+> **Give it real paths on your machine.** The server runs natively, so it reads
+> your filesystem — not files you attach to the chat, which live in the
+> assistant's own sandbox. Say `~/Downloads/clip.mov`, not
+> `/mnt/user-data/uploads/clip.mov`. Paths must also sit under
+> `FFMPEG_MCP_ALLOWED_ROOTS`, which defaults to your home directory.
+
 ## How it works
 
 <p align="center">

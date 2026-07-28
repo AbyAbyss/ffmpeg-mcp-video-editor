@@ -14,6 +14,19 @@ from pathlib import Path
 from .config import Settings, get_settings
 from .errors import FileTooLargeError, InvalidPathError
 
+# Paths that belong to an assistant's own sandbox rather than to this machine.
+# A model that attached a file to the conversation will reach for one of these,
+# and the plain "outside the allowed roots" message sends it looking for a
+# misconfiguration that does not exist.
+_ASSISTANT_SANDBOX_PREFIXES = (
+    "/mnt/user-data",
+    "/mnt/outputs",
+    "/mnt/skills",
+    "/mnt/knowledge",
+    "/home/claude",
+    "/tmp/outputs",
+)
+
 
 def _is_within(candidate: Path, root: Path) -> bool:
     try:
@@ -21,6 +34,14 @@ def _is_within(candidate: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def looks_like_assistant_sandbox(path: Path) -> bool:
+    """Whether a path looks like it belongs to an assistant's sandbox, not this host."""
+    text = str(path)
+    return any(
+        text == prefix or text.startswith(prefix + "/") for prefix in _ASSISTANT_SANDBOX_PREFIXES
+    )
 
 
 def resolve_within_roots(raw: str | Path, settings: Settings | None = None) -> Path:
@@ -47,10 +68,32 @@ def resolve_within_roots(raw: str | Path, settings: Settings | None = None) -> P
 
     roots = [r.resolve(strict=False) for r in settings.allowed_roots]
     if not any(_is_within(resolved, root) for root in roots):
+        # Check the path as supplied as well as resolved: on macOS /tmp is a
+        # symlink to /private/tmp and /home is an autofs mount, so resolution
+        # rewrites exactly the prefixes being looked for.
+        if looks_like_assistant_sandbox(resolved) or looks_like_assistant_sandbox(path):
+            # The likeliest cause by far is a file attached to the conversation,
+            # which lives in the assistant's sandbox and not on this machine.
+            raise InvalidPathError(
+                "That path is not on this machine. It looks like a file inside the "
+                "assistant's own sandbox, such as an attachment uploaded to the "
+                "conversation. This server runs on the user's computer and can only "
+                "read files that exist there. Ask the user for the file's real path "
+                "on their machine, for example '~/Downloads/clip.mov'.",
+                path=str(resolved),
+                allowed_roots=[str(r) for r in roots],
+                reason="assistant_sandbox_path",
+            )
         raise InvalidPathError(
-            "Path resolves outside the configured allowed roots.",
+            "Path resolves outside the configured allowed roots."
+            + ("" if resolved.exists() else " It also does not exist on this machine."),
             path=str(resolved),
             allowed_roots=[str(r) for r in roots],
+            reason="outside_allowed_roots",
+            hint=(
+                "Give a path under one of the allowed roots, or set "
+                "FFMPEG_MCP_ALLOWED_ROOTS to include this location."
+            ),
         )
     return resolved
 

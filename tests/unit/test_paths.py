@@ -108,3 +108,61 @@ class TestOutputValidation:
             validate_output_path(
                 Path(os.sep) / "etc" / "evil.mp4", suggested_name="a.mp4", settings=settings
             )
+
+
+class TestUnreachablePathMessages:
+    """A tool error is read by the calling model, so it has to point somewhere.
+
+    An attachment lives in the assistant's sandbox, not on the host. Saying only
+    "outside the allowed roots" sends the model hunting for a misconfiguration
+    that does not exist.
+    """
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/mnt/user-data/uploads/IMG_1779.MOV",
+            "/mnt/outputs/render.mp4",
+            "/mnt/skills/public/thing",
+            "/home/claude/clip.mp4",
+            "/tmp/outputs/out.mp4",
+        ],
+    )
+    def test_a_sandbox_path_says_it_is_not_on_this_machine(
+        self, settings: Settings, path: str
+    ) -> None:
+        with pytest.raises(InvalidPathError) as info:
+            resolve_within_roots(path, settings)
+        assert info.value.details["reason"] == "assistant_sandbox_path"
+        assert "not on this machine" in info.value.message
+        assert "real path" in info.value.message
+
+    def test_an_ordinary_outside_path_keeps_the_allowlist_message(self, settings: Settings) -> None:
+        with pytest.raises(InvalidPathError) as info:
+            resolve_within_roots("/etc/passwd", settings)
+        assert info.value.details["reason"] == "outside_allowed_roots"
+        assert "allowed roots" in info.value.message
+        assert "FFMPEG_MCP_ALLOWED_ROOTS" in info.value.details["hint"]
+
+    def test_a_nonexistent_outside_path_says_so_too(self, settings: Settings) -> None:
+        with pytest.raises(InvalidPathError) as info:
+            resolve_within_roots("/nowhere/at/all/clip.mp4", settings)
+        assert "does not exist on this machine" in info.value.message
+
+    def test_a_real_path_that_merely_sits_outside_does_not_claim_to_be_missing(
+        self, settings: Settings
+    ) -> None:
+        with pytest.raises(InvalidPathError) as info:
+            resolve_within_roots("/etc", settings)
+        assert "does not exist" not in info.value.message
+
+    def test_a_directory_merely_named_like_the_sandbox_inside_a_root_is_fine(
+        self, workspace: Path
+    ) -> None:
+        # The check must not fire on a legitimate folder that happens to match.
+        from ..conftest import make_settings
+
+        configured = make_settings(workspace)
+        target = workspace / "mnt" / "user-data"
+        target.mkdir(parents=True)
+        assert resolve_within_roots(target, configured) == target
