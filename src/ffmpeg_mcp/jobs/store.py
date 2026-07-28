@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     message          TEXT,
     cancel_requested INTEGER NOT NULL DEFAULT 0,
     worker_pid       INTEGER,
-    heartbeat_at     REAL
+    heartbeat_at     REAL,
+    schema_fingerprint TEXT
 );
 CREATE INDEX IF NOT EXISTS jobs_status_created ON jobs (status, created_at);
 """
@@ -110,6 +111,11 @@ class JobStore:
         conn = self._connect()
         try:
             conn.executescript(_SCHEMA)
+            # Older stores predate the fingerprint; add it rather than making
+            # anyone delete their job history to upgrade.
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+            if "schema_fingerprint" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN schema_fingerprint TEXT")
         finally:
             conn.close()
 
@@ -138,21 +144,24 @@ class JobStore:
 
     # -- writes ------------------------------------------------------------- #
 
-    def create(self, tool: str, params: dict[str, Any]) -> JobRecord:
+    def create(
+        self, tool: str, params: dict[str, Any], schema_fingerprint: str | None = None
+    ) -> JobRecord:
         """Enqueue a new job and return its record."""
         job_id = uuid.uuid4().hex[:16]
         now = time.time()
         with self._cursor() as cursor:
             cursor.execute(
-                "INSERT INTO jobs (job_id, tool, status, created_at, params) VALUES (?,?,?,?,?)",
-                (job_id, tool, JobStatus.QUEUED.value, now, _dumps(params)),
+                "INSERT INTO jobs (job_id, tool, status, created_at, params, schema_fingerprint) "
+                "VALUES (?,?,?,?,?,?)",
+                (job_id, tool, JobStatus.QUEUED.value, now, _dumps(params), schema_fingerprint),
             )
         log.info("Job %s queued for tool %s", job_id, tool)
         return JobRecord(
             job_id=job_id, tool=tool, status=JobStatus.QUEUED, created_at=now, params=params
         )
 
-    def claim_next(self, worker_pid: int) -> JobRecord | None:
+    def claim_next(self, worker_pid: int, known: dict[str, str] | None = None) -> JobRecord | None:
         """Atomically take the oldest queued job. Returns None if the queue is empty.
 
         ``BEGIN IMMEDIATE`` takes the write lock before the select, so two
@@ -160,10 +169,24 @@ class JobStore:
         """
         now = time.time()
         with self._cursor(immediate=True) as cursor:
-            row = cursor.execute(
-                "SELECT * FROM jobs WHERE status = ? ORDER BY created_at LIMIT 1",
-                (JobStatus.QUEUED.value,),
-            ).fetchone()
+            if known is None:
+                row = cursor.execute(
+                    "SELECT * FROM jobs WHERE status = ? ORDER BY created_at LIMIT 1",
+                    (JobStatus.QUEUED.value,),
+                ).fetchone()
+            else:
+                # Leave work stamped by a build whose schema differs to whichever
+                # worker can actually run it. A NULL stamp is pre-upgrade, so it
+                # is claimable by anyone.
+                pairs = [f"{tool}:{fp}" for tool, fp in known.items()]
+                placeholders = ",".join("?" * len(pairs)) or "NULL"
+                row = cursor.execute(
+                    "SELECT * FROM jobs WHERE status = ? AND ("
+                    "  schema_fingerprint IS NULL"
+                    f"  OR (tool || ':' || schema_fingerprint) IN ({placeholders})"
+                    ") ORDER BY created_at LIMIT 1",
+                    (JobStatus.QUEUED.value, *pairs),
+                ).fetchone()
             if row is None:
                 return None
             cursor.execute(

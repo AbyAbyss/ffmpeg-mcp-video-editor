@@ -268,3 +268,79 @@ class TestExecuteJob:
         load_all_tools()
         for name in ("trim", "concat", "convert_format", "transform", "speed_ramp"):
             assert get_handler(name) is not None, f"{name} has no job handler"
+
+
+class TestBuildSkew:
+    """Two processes share one queue, and they may be running different builds.
+
+    Reproduces the real failure: a job enqueued by a build that knows a field is
+    claimed by an older worker whose model rejects it, which surfaced as a raw
+    pydantic dump on a job the user never queued themselves.
+    """
+
+    def test_a_worker_skips_work_stamped_by_a_different_schema(self, store: JobStore) -> None:
+        store.create("trim", {}, schema_fingerprint="from-a-newer-build")
+        assert store.claim_next(1, known={"trim": "this-build"}) is None
+
+    def test_a_worker_claims_work_matching_its_own_schema(self, store: JobStore) -> None:
+        record = store.create("trim", {}, schema_fingerprint="same")
+        claimed = store.claim_next(1, known={"trim": "same"})
+        assert claimed is not None and claimed.job_id == record.job_id
+
+    def test_matching_is_per_tool_not_global(self, store: JobStore) -> None:
+        store.create("trim", {}, schema_fingerprint="trim-v2")
+        assert store.claim_next(1, known={"concat": "trim-v2", "trim": "trim-v1"}) is None
+
+    def test_unstamped_jobs_stay_claimable(self, store: JobStore) -> None:
+        # Rows written before the upgrade must not become permanently stuck.
+        record = store.create("trim", {})
+        claimed = store.claim_next(1, known={"trim": "anything"})
+        assert claimed is not None and claimed.job_id == record.job_id
+
+    def test_a_skipped_job_waits_rather_than_failing(self, store: JobStore) -> None:
+        record = store.create("trim", {}, schema_fingerprint="newer")
+        store.claim_next(1, known={"trim": "older"})
+        assert store.get(record.job_id).status is JobStatus.QUEUED
+
+    def test_an_incompatible_worker_does_not_starve_a_compatible_one(self, store: JobStore) -> None:
+        theirs = store.create("trim", {}, schema_fingerprint="newer")
+        store.claim_next(1, known={"trim": "older"})  # old worker passes
+        claimed = store.claim_next(2, known={"trim": "newer"})  # new worker takes it
+        assert claimed is not None and claimed.job_id == theirs.job_id
+
+    def test_fingerprints_track_the_schema(self) -> None:
+        from ffmpeg_mcp.tools.registry import get_tool, load_all_tools
+
+        load_all_tools()
+        spec = get_tool("render_timeline")
+        assert spec is not None
+        assert spec.schema_fingerprint() == spec.schema_fingerprint()  # stable
+        assert len(spec.schema_fingerprint()) == 12
+        # Distinct tools have distinct schemas, so distinct fingerprints.
+        assert spec.schema_fingerprint() != get_tool("trim").schema_fingerprint()
+
+    async def test_a_validation_failure_is_explained_not_dumped(
+        self, store: JobStore, settings: Settings
+    ) -> None:
+        from pydantic import BaseModel
+
+        from ffmpeg_mcp.jobs.worker import JobContext, JobOutcome, register_handler
+
+        class Strict(BaseModel, extra="forbid"):
+            known: int = 0
+
+        async def picky(ctx: JobContext) -> JobOutcome:
+            Strict.model_validate(ctx.params)  # params carry a field this build lacks
+            return JobOutcome()
+
+        register_handler("unit_picky", picky)
+        record = store.create("unit_picky", {"known": 1, "from_newer_build": "tv"})
+        claimed = store.claim_next(1)
+        assert claimed is not None
+        await execute_job(claimed, store, settings)
+
+        failed = store.get(record.job_id)
+        assert failed.error is not None
+        assert failed.error.code == "incompatible_build"
+        assert "Restart every ffmpeg-mcp server" in failed.error.message
+        assert "validation_error" in failed.error.details

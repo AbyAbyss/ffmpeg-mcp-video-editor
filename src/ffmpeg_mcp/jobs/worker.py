@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from ..config import Settings, get_settings
 from ..errors import FFmpegMCPError, JobCancelledError
 from ..models import JobError, JobRecord
@@ -142,6 +144,26 @@ async def execute_job(record: JobRecord, store: JobStore, settings: Settings) ->
         return
     try:
         outcome = await fn(context)
+    except ValidationError as exc:
+        # The tool layer already validated these arguments at enqueue time, so
+        # reaching here means the job was written by a build whose schema
+        # differs from this one. Say that, rather than dumping pydantic at the
+        # user.
+        log.warning("Job %s was written by an incompatible build", record.job_id)
+        await asyncio.to_thread(
+            store.fail,
+            record.job_id,
+            JobError(
+                code="incompatible_build",
+                message=(
+                    f"This job was queued by a different build of ffmpeg-mcp than the "
+                    f"worker that ran it, so its arguments for {record.tool!r} no longer "
+                    f"validate. Restart every ffmpeg-mcp server and UI process so they "
+                    f"all run the same code, then queue it again."
+                ),
+                details={"tool": record.tool, "validation_error": str(exc)},
+            ),
+        )
     except JobCancelledError:
         await asyncio.to_thread(store.mark_cancelled, record.job_id)
     except FFmpegMCPError as exc:
@@ -201,11 +223,19 @@ class WorkerPool:
         await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks = []
 
+    def _known_fingerprints(self) -> dict[str, str]:
+        """Schema fingerprints this build can run, keyed by tool name."""
+        from ..tools.registry import all_tools, load_all_tools
+
+        specs = all_tools() or load_all_tools()
+        return {spec.name: spec.schema_fingerprint() for spec in specs}
+
     async def _run_worker(self, index: int) -> None:
         pid = os.getpid()
+        known = self._known_fingerprints()
         while not self._stopping.is_set():
             try:
-                record = await asyncio.to_thread(self.store.claim_next, pid)
+                record = await asyncio.to_thread(self.store.claim_next, pid, known)
             except Exception:
                 log.exception("Worker %d failed to claim a job", index)
                 await asyncio.sleep(1.0)
@@ -240,7 +270,10 @@ def submit(tool: str, params: dict[str, Any], settings: Settings | None = None) 
     store = get_store(settings)
     if get_handler(tool) is None:
         raise ValueError(f"No handler registered for tool {tool!r}")
-    return store.create(tool, params)
+    from ..tools.registry import get_tool
+
+    spec = get_tool(tool)
+    return store.create(tool, params, spec.schema_fingerprint() if spec else None)
 
 
 def status_of(job_id: str, settings: Settings | None = None) -> JobRecord:

@@ -8,7 +8,9 @@ implementation.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar, get_type_hints
@@ -37,6 +39,17 @@ class ToolSpec:
     def input_schema(self) -> dict[str, Any]:
         """JSON schema for the tool's arguments."""
         return self.input_model.model_json_schema()
+
+    def schema_fingerprint(self) -> str:
+        """A short hash of this tool's argument schema.
+
+        Jobs carry the fingerprint of the build that enqueued them so a worker
+        running different code does not claim work it cannot faithfully run.
+        A version number would not do: two builds can disagree about a schema
+        while both calling themselves 0.1.0.
+        """
+        canonical = json.dumps(self.input_schema(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical.encode()).hexdigest()[:12]
 
     def output_schema(self) -> dict[str, Any]:
         """JSON schema for the tool's structured result."""
