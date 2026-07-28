@@ -14,7 +14,7 @@
 
 <p align="center">
   Give any MCP client a real video editor —<br>
-  <b>32 typed tools</b> over ffmpeg, Whisper and MediaPipe, plus an optional local UI
+  <b>38 typed tools</b> over ffmpeg, Whisper and MediaPipe, plus an optional local UI
   with a <b>drag-and-drop timeline</b>.
 </p>
 
